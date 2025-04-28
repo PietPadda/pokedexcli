@@ -66,7 +66,9 @@ func commandExit(cfg *config) error { // accepts config file now for pagination
 // callback - lists all registered commands
 func commandHelp(cfg *config) error { // accepts config file now for pagination
 	fmt.Println("Welcome to the Pokedex!")
-	fmt.Println("Usage:\n") // newline at end for separation of command list
+	fmt.Println("Usage:")
+	fmt.Println() // newline at end for separation of command list
+	// CORE: GO IS DUMB! can't just add a \n... need to make a NEW blank fmt.Println or get UNIT TEST ERRORS!!
 
 	commands := getCommands() // get all commands
 

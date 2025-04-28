@@ -3,10 +3,14 @@
 package pokeapi // our internal package pokeapi
 
 import (
+	// standard Go libraries
 	"encoding/json" // for unmarshalling json to Go readable
 	"fmt"           // for Errorf printing
 	"io"            // for reading raw json data
 	"net/http"      // for HTTP requests/responses
+
+	// internal packages
+	"github.com/PietPadda/pokedexcli/internal/pokecache" // our internal package pokecache
 )
 
 // pokeapi json response struct (LAR) -- all fields exportable
@@ -25,13 +29,16 @@ type LocationArea struct {
 
 // Client is the PokeAPI client
 type Client struct {
-	httpClient http.Client // holds HTTP client to make API requests
+	httpClient http.Client      // holds HTTP client to make API requests
+	cache      *pokecache.Cache // cached entries to prevent unnecessary API requests
 }
 
 // NewClient creates a new PokeAPI client
-func NewClient() Client { // init and returns a client
+// now takes the cache for checking cached items
+func NewClient(cache *pokecache.Cache) Client { // init and returns a client
 	return Client{
 		httpClient: http.Client{}, // init with a default HTTP client
+		cache:      cache,         // init with the cache
 	}
 }
 
@@ -39,6 +46,11 @@ func NewClient() Client { // init and returns a client
 // takes a url request input, and outputs the location area and success/failure error
 // it's a method on the client (Go style "OOP")
 func (c *Client) GetLocationAreas(pageURL string) (LocationAreaResponse, error) {
+	// nil ptr check
+	if c == nil {
+		return LocationAreaResponse{}, fmt.Errorf("GetLocationAreas called with nil receiver") // early return
+	} // runtime panic if try access ptr fields, no memory location!
+
 	// determine default url for locations
 	baseURL := "https://pokeapi.co/api/v2" // api url
 	resourceURL := "/location-area"        // resource url
@@ -48,6 +60,33 @@ func (c *Client) GetLocationAreas(pageURL string) (LocationAreaResponse, error) 
 	if pageURL == "" {
 		pageURL = fullURL // set url to fullURL
 	}
+
+	// cached entry call, store IF found and IF error
+	cachedEntries, ok, err := c.cache.CacheGet(pageURL) // if response already cached
+
+	// cache entries call check
+	if err != nil {
+		return LocationAreaResponse{}, fmt.Errorf("error getting cached entries: %w", err) // nil slice & error
+	}
+
+	// if cache entries found
+	if ok {
+		// first, create nil slice for external data response
+		var locationRes LocationAreaResponse
+
+		// then unmarshal
+		err := json.Unmarshal(cachedEntries, &locationRes)
+
+		// unmarshal to conv from raw json to go readable code
+		if err != nil {
+			return locationRes, fmt.Errorf("error unmarshalling json data: %w", err) // nil slice & error
+		}
+
+		// can now return the CACHED location area response from server as success
+		return locationRes, nil // nil error
+	}
+
+	// if not cached, need to make new HTTP GET request
 
 	// HTTP GET request using newrequest for more flexibility
 	req, err := http.NewRequest("GET", pageURL, nil) // GET request, so no response body
@@ -61,8 +100,9 @@ func (c *Client) GetLocationAreas(pageURL string) (LocationAreaResponse, error) 
 	req.Header.Set("Accept", "application/json") // expects json data as HTTP response
 	// CORE: "Content-Type" - sending TO server, "Accept" - response FROM server
 
-	// create new HTTP client
-	//client := &http.Client{} // bad practice to use DefaultClient
+	// don’t create a new HTTP client
+	// client := &http.Client{}
+
 	// we no longer create a new client, but use the pokeapi httpClient below
 	// client do GET request
 	res, err := c.httpClient.Do(req)
@@ -102,6 +142,15 @@ func (c *Client) GetLocationAreas(pageURL string) (LocationAreaResponse, error) 
 	if err != nil {
 		return locationRes, fmt.Errorf("error unmarshalling json data: %w", err) // nil slice & error
 	}
+
+	// the http response is now unmarshalled, let's first add it to the cache for future reference!
+	err = c.cache.CacheAdd(pageURL, body) // add url as key to cache + body (the raw "data"), return error
+
+	// cache add check
+	if err != nil {
+		fmt.Printf("error adding to cache: %v\n", err) // HTTP request slice & error
+		// DON'T RETURN! we still want to continue with the actual HTTP response return, else nothing happens!
+	} // printf for FORMATTED print, println can't use %v verb!
 
 	// can now return the location area response from server as success
 	return locationRes, nil // nil error
