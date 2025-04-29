@@ -24,7 +24,9 @@ type config struct {
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(*config) error // needs to accepet the *config pointer
+	callback    func(*config, []string) error
+	// callback *config pointer for pagination & pokeapi client
+	// callback []string for command handling of parameters
 }
 
 // CORE: we pass config ptr to callback to allow NEXT & PREVIOUS pagination to all commands
@@ -33,38 +35,47 @@ type cliCommand struct {
 // all commands are "registered" here
 func getCommands() map[string]cliCommand {
 	return map[string]cliCommand{
-		"exit": { // exit command
+		"exit": { // exit command -- exit program
 			name:        "exit",
 			description: "Exit the Pokedex",
 			callback:    commandExit,
 		},
-		"help": { // help command
+		"help": { // help command -- shows callback commands
 			name:        "help",
 			description: "List all Commands",
 			callback:    commandHelp,
 		},
-		"map": { // map command
+		"map": { // map command -- paginates locations
 			name:        "map",
 			description: "List next 20 Locations",
 			callback:    commandMap,
 		},
-		"mapb": { // mapb command
+		"mapb": { // mapb command -- depaginates locations
 			name:        "mapb",
 			description: "List previous 20 Locations",
 			callback:    commandMapb,
+		},
+		"explore": { // explore command -- shows pokemons at location
+			name:        "explore",
+			description: "List pokemon available at Location (takes location arg)",
+			callback:    commandExplore,
 		},
 	}
 }
 
 // callback - terminates the program
-func commandExit(cfg *config) error { // accepts config file now for pagination
+// accepts config file for pagination & pokeapi client
+// accepts args for command parameters
+func commandExit(cfg *config, args []string) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0) // neatly terminate program
 	return nil // no error on exit
 }
 
 // callback - lists all registered commands
-func commandHelp(cfg *config) error { // accepts config file now for pagination
+// accepts config file for pagination & pokeapi client
+// accepts args for command parameters
+func commandHelp(cfg *config, args []string) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
 	fmt.Println() // newline at end for separation of command list
@@ -83,7 +94,9 @@ func commandHelp(cfg *config) error { // accepts config file now for pagination
 }
 
 // callback - prints the map locations and increases the URL pagination
-func commandMap(cfg *config) error { // accepts config file now for pagination
+// accepts config file for pagination & pokeapi client
+// accepts args for command parameters
+func commandMap(cfg *config, args []string) error {
 	// first set the default url if no request has been made
 	url := cfg.NextURL
 
@@ -127,7 +140,9 @@ func commandMap(cfg *config) error { // accepts config file now for pagination
 }
 
 // callback - prints the map locations and decreases the URL pagination
-func commandMapb(cfg *config) error { // accepts config file now for pagination
+// accepts config file for pagination & pokeapi client
+// accepts args for command parameters
+func commandMapb(cfg *config, args []string) error {
 	// first set the default url if no request has been made
 	url := cfg.PrevURL
 
@@ -170,6 +185,51 @@ func commandMapb(cfg *config) error { // accepts config file now for pagination
 	return nil
 }
 
+// callback - prints pokemon available at location arg
+// accepts config file for pagination & pokeapi client
+// accepts args for command parameters
+func commandExplore(cfg *config, args []string) error {
+	// nil ptr check (Go Best Practice)
+	if cfg == nil {
+		return fmt.Errorf("error: config is nil") // early return custom error
+	}
+
+	// args check
+	if len(args) == 0 { // no arg(s) provided
+		return fmt.Errorf("error: explore must take location area name as argument") // early return custom error
+	}
+
+	// get location area name from args
+	locationAreaName := args[0] // location area is first arg
+
+	// use pokeapi client to fetch the pokemon from this location
+	res, err := cfg.PokeapiClient.GetLocationArea(locationAreaName) // pass location name here
+	// REVIEW: config holds client field, client fetches data with method called on it, method uses location area
+
+	// fetch check
+	if err != nil {
+		return fmt.Errorf("error client fetching pokemon from location: %w", err)
+	}
+
+	// loop thru response results and print all pokemon to terminal
+	fmt.Printf("Exploring %s...\n", locationAreaName) // initial print before looping
+
+	// no pokemon found check
+	if len(res.PokemonEncounters) == 0 {
+		fmt.Println("No Pokemon were found at this location.")
+		return nil // still a success, just empty location
+	}
+
+	fmt.Println("Found Pokemon:")                     // initial print before looping
+	for _, encounter := range res.PokemonEncounters { // from PokemonEncounters (PE) in client.go
+		// print each pokemon with a newline
+		fmt.Printf("- %s\n", encounter.Pokemon.Name) // from PokemonEncounters
+	}
+
+	// return success
+	return nil
+}
+
 // startREPL starts the Read-Eval-Print-Loop for the Pokedex CLI
 func startREPL(pokeClient pokeapi.Client) {
 	// block until user input
@@ -194,14 +254,15 @@ func startREPL(pokeClient pokeapi.Client) {
 			continue // don't do the rest
 		}
 
-		commandInput := cleanedInput[0] // get first word from input
+		commandInput := cleanedInput[0] // get command (first word) from input
+		args := cleanedInput[1:]        // get args (rest of words) from input
 
 		// loop through command list to check if input exists (registry lookup)
 		command, ok := commands[commandInput] // see if input exists here
 
 		// if it exists callback it
 		if ok {
-			err := command.callback(cfg) // return callback err value to car
+			err := command.callback(cfg, args) // return callback err value to var
 			// CORE: need to pass config file here to call funcs to allow pagination
 
 			// callback check
