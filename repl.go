@@ -67,6 +67,11 @@ func getCommands() map[string]cliCommand {
 			description: "Try to catch Pokemon (takes pokemon arg)",
 			callback:    commandCatch,
 		},
+		"inspect": { // inspect command -- attempt to list stats of a pokemon in the pokedex (if caught)
+			name:        "inspect",
+			description: "Lists stats of pokemon in pokedex (takes pokemon arg)",
+			callback:    commandInspect,
+		},
 	}
 }
 
@@ -295,6 +300,65 @@ func commandCatch(cfg *config, args []string) error {
 		fmt.Printf("%s escaped!\n", pokemonName) // it escaped
 		// no pokemon added as catchSuccess is false
 	}
+
+	// return success
+	return nil
+}
+
+// callback - prints pokemon stats that's caught in pokedex
+// accepts config file for pokedex
+// accepts args for command parameters
+func commandInspect(cfg *config, args []string) error {
+	// nil ptr check (Go Best Practice)
+	if cfg == nil {
+		return fmt.Errorf("error: config is nil") // early return custom error
+	}
+
+	// args check
+	if len(args) == 0 { // no arg(s) provided
+		return fmt.Errorf("error: inspect must take pokemon name as argument") // early return custom error
+	}
+
+	// get location area name from args
+	pokemonName := args[0] // pokemon name is first arg
+
+	// NOTE: don't need use pokeapi client to fetch as it's already caught (supposed to be) and in pokedex!
+
+	// loop through pokedex to check if pokemon exists (comma-ok check + bonus err)
+	pokemon, ok, err := cfg.Pokedex.PokemonGet(pokemonName) // see if input exists here
+
+	// pokedex entries call check
+	if err != nil {
+		return fmt.Errorf("error getting pokedex entry: %w", err) // only err message
+	}
+
+	// pokemon found check
+	if !ok { //if ok return false
+		fmt.Println("you have not caught that pokemon") // display not found in pokedex to user
+		return nil                                      // return success
+	}
+
+	// display the pokemon's stats
+	fmt.Printf("Name: %s\n", pokemon.Name)     // display name
+	fmt.Printf("Height: %d\n", pokemon.Height) // display height
+	fmt.Printf("Weight: %d\n", pokemon.Weight) // display weight
+
+	// display stats header before looping
+	fmt.Println("Stats:")
+	// loop thru stats and display them with names
+	for _, stat := range pokemon.Stats { // stats contains name and basestat value
+		fmt.Printf("  -%s: %d\n", stat.Stat.Name, stat.BaseStat) // print each name and int value
+	}
+	// PokemonStats struct contains a PokemonStat struct with array "Stat", which has a field "Name" thus stat.Stat.Name
+	// PokemonStats contains a PokemonStat struct with field "BaseState" thus stat.BaseStat
+
+	// display types header before looping
+	fmt.Println("Types:")
+	// loop thru stats and display them with names
+	for _, pokemonType := range pokemon.Types { // types array just has names
+		fmt.Printf("  - %s\n", pokemonType.Type.Name) // print each type
+	}
+	// PokemonStats struct contains a PokemonTypes struct with array "Type", which has a field "Name" thus pokemonType.Type.Name
 
 	// return success
 	return nil

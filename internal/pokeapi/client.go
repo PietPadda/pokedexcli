@@ -52,9 +52,30 @@ type Pokemon struct {
 // POKEMON STATS STRUCTS
 // pokemon stats (PS) -- all fields exportable
 type PokemonStats struct {
-	Name           string `json:"name"`            // pokemon name (for storing in pokedex)
-	BaseExperience int    `json:"base_experience"` // pokemon base experience (for catch probability)
-	ID             int    `json:"id"`              // pokemon id (we use name, but can also use id)
+	Stats          []PokemonStat  `json:"stats"`           // ARRAY of pokemon stats
+	Types          []PokemonTypes `json:"types"`           // ARRAY of pokemon types
+	Name           string         `json:"name"`            // pokemon name (for storing in pokedex)
+	BaseExperience int            `json:"base_experience"` // pokemon base experience (for catch probability)
+	ID             int            `json:"id"`              // pokemon id (we use name, but can also use id)
+	Height         int            `json:"height"`          // pokemon height
+	Weight         int            `json:"weight"`          // pokemon weight
+}
+
+// CORE: remember to sort LARGEST to SMALLEST for memory efficiency!!
+
+// pokemon stat (Ps) -- all fields exportable
+type PokemonStat struct {
+	Stat struct {
+		Name string `json:"name"` // pokemon stat name
+	} `json:"stat"`
+	BaseStat int `json:"base_stat"` // pokemon base stat
+}
+
+// pokemon types (PT) -- all fields exportable
+type PokemonTypes struct {
+	Type struct {
+		Name string `json:"name"` // pokemon type name
+	} `json:"type"`
 }
 
 // CLIENT STRUCTS:
