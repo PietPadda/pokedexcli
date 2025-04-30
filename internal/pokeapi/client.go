@@ -480,7 +480,7 @@ func (p *Pokedex) PokemonAdd(name string, stats PokemonStats) error { // adds ne
 
 // pokedex get function -- gets an existing entry from the pokedex
 // takes *Pokedex -- returns a PokemonStats struct and "found" bool, and error
-// takes a URL-key as input
+// takes a pokemon name
 func (p *Pokedex) PokemonGet(name string) (PokemonStats, bool, error) { // returns existing pokemon
 	// nil ptr check
 	if p == nil {
@@ -504,4 +504,34 @@ func (p *Pokedex) PokemonGet(name string) (PokemonStats, bool, error) { // retur
 
 	// otherwise, found entry and return as success
 	return entry, true, nil
+}
+
+// pokedex get ALL caught names function -- gets ALL existing entries from the pokedex
+// takes *Pokedex -- returns a []string and error
+// takes no input
+func (p *Pokedex) PokemonGetAllCaught() ([]string, error) { // returns all pokemon
+	// nil ptr check
+	if p == nil {
+		return nil, fmt.Errorf("PokemonGetAllCaught called with nil receiver") // early return
+	} // runtime panic if try access ptr fields, no memory location!
+
+	// READ lock mutex before accessing map
+	p.mu.RLock()         // READ lock only, allows fast access!
+	defer p.mu.RUnlock() // will READ unlock on *Pokedex return
+
+	// get pokedex map
+	pokedexMap := p.pokemon // readability, otherwise pointless
+
+	// create a NIL slice to hold all the caught pokemon
+	names := make([]string, 0, len(pokedexMap))
+	// init 0 length, and buffer capacity to exactly pokedex map size (p.pokemon)
+	// nil slice to return nil if empty
+
+	// loop thru pokedex map and append each name to the empty names slice
+	for name := range pokedexMap {
+		names = append(names, name) // append each name in map to the slice
+	}
+
+	// otherwise, found entry and return as success
+	return names, nil
 }

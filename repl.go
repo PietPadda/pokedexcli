@@ -72,6 +72,11 @@ func getCommands() map[string]cliCommand {
 			description: "Lists stats of pokemon in pokedex (takes pokemon arg)",
 			callback:    commandInspect,
 		},
+		"pokedex": { // pokedex command -- lists all pokemon in the pokedex
+			name:        "pokedex",
+			description: "Lists all pokemon caught in the pokedex",
+			callback:    commandPokedex,
+		},
 	}
 }
 
@@ -359,6 +364,45 @@ func commandInspect(cfg *config, args []string) error {
 		fmt.Printf("  - %s\n", pokemonType.Type.Name) // print each type
 	}
 	// PokemonStats struct contains a PokemonTypes struct with array "Type", which has a field "Name" thus pokemonType.Type.Name
+
+	// return success
+	return nil
+}
+
+// callback - prints all pokemon caught in the pokedex
+// accepts config file for pokedex
+func commandPokedex(cfg *config, args []string) error {
+	// nil ptr check (Go Best Practice)
+	if cfg == nil {
+		return fmt.Errorf("error: config is nil") // early return custom error
+	}
+
+	// NOTE: don't need use pokeapi client to fetch as it's already caught (supposed to be) and in pokedex!
+
+	// display pokedex header before looping
+	fmt.Println("Your Pokedex:")
+
+	// get all the pokemon from pokedex
+	names, err := cfg.Pokedex.PokemonGetAllCaught() // save all names and err to vars
+	// apply method to pokedex which is init in config
+
+	// get all names check
+	if err != nil {
+		return fmt.Errorf("error getting all pokemon from pokedex: %w", err) // early return
+	}
+
+	// empty amp check
+	if len(names) == 0 {
+		fmt.Println("You have not caught any pokemon yet!")
+		return nil //early return
+	}
+
+	// there are pokemon! let's proceed with print
+
+	// loop thru pokedex to get names
+	for _, pokemonName := range names { // names of pokemon in pokedex
+		fmt.Printf(" - %s\n", pokemonName) // print pokedex pokemon
+	}
 
 	// return success
 	return nil
