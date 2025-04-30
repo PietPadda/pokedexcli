@@ -78,7 +78,7 @@ func (c *Cache) reapLoop() {
 func (c *Cache) CacheAdd(key string, val []byte) error { // returns new cache
 	// nil ptr check
 	if c == nil {
-		return fmt.Errorf("cacheAdd called with nil receiver") // early return
+		return fmt.Errorf("CacheAdd called with nil receiver") // early return
 	} // runtime panic if try access ptr fields, no memory location!
 
 	// get inputs (just for readability)
@@ -108,7 +108,7 @@ func (c *Cache) CacheAdd(key string, val []byte) error { // returns new cache
 func (c *Cache) CacheGet(key string) ([]byte, bool, error) { // returns existing cache
 	// nil ptr check
 	if c == nil {
-		return nil, false, fmt.Errorf("cacheGet called with nil receiver") // early return
+		return nil, false, fmt.Errorf("CacheGet called with nil receiver") // early return
 	} // runtime panic if try access ptr fields, no memory location!
 
 	// get inputs (just for readability)

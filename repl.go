@@ -3,10 +3,11 @@ package main // all files in same folder form part of package main
 
 import (
 	// import standard libraries
-	"bufio"   // for input blocking
-	"fmt"     // for printing
-	"os"      // for OS input
-	"strings" // for Fields (split whitespace) and ToLower (lowercase)
+	"bufio"     // for input blocking
+	"fmt"       // for printing
+	"math/rand" // for catch probability
+	"os"        // for OS input
+	"strings"   // for Fields (split whitespace) and ToLower (lowercase)
 
 	// import internal packages
 	"github.com/PietPadda/pokedexcli/internal/pokeapi" // our internal package pokeapi
@@ -14,9 +15,10 @@ import (
 
 // for paginating through location areas
 type config struct {
-	NextURL       string         // next 20 areas (map command)
-	PrevURL       string         // previous 20 areas (mapb command)
-	PokeapiClient pokeapi.Client // client to make API calls
+	NextURL       string           // next 20 areas (map command)
+	PrevURL       string           // previous 20 areas (mapb command)
+	PokeapiClient pokeapi.Client   // client to make API calls
+	Pokedex       *pokeapi.Pokedex // for storing caught pokemon
 }
 
 // our command registry (abstraction)
@@ -59,6 +61,11 @@ func getCommands() map[string]cliCommand {
 			name:        "explore",
 			description: "List pokemon available at Location (takes location arg)",
 			callback:    commandExplore,
+		},
+		"catch": { // catch command -- attempt to catch pokemon at location
+			name:        "catch",
+			description: "Try to catch Pokemon (takes pokemon arg)",
+			callback:    commandCatch,
 		},
 	}
 }
@@ -230,13 +237,77 @@ func commandExplore(cfg *config, args []string) error {
 	return nil
 }
 
+// callback - fetches pokemon details and attempts to catch it
+// accepts config file for pagination & pokeapi client
+// accepts args for command parameters
+func commandCatch(cfg *config, args []string) error {
+	// nil ptr check (Go Best Practice)
+	if cfg == nil {
+		return fmt.Errorf("error: config is nil") // early return custom error
+	}
+
+	// args check
+	if len(args) == 0 { // no arg(s) provided
+		return fmt.Errorf("error: catch must take pokemon name as argument") // early return custom error
+	}
+
+	// get location area name from args
+	pokemonName := args[0] // pokemon name is first arg
+
+	// use pokeapi client to fetch the pokemon details
+	res, err := cfg.PokeapiClient.GetPokemonStats(pokemonName) // pass pokemon name here
+	// REVIEW: config holds client field, client fetches data with method called on it, method uses location area
+
+	// fetch check
+	if err != nil {
+		return fmt.Errorf("error client fetching pokemon details: %w", err)
+	}
+
+	// get pokemon base experience for catch probability calc
+	baseExperience := res.BaseExperience // from PokemonStats struct
+
+	// calculate probability of catching using inverse proportion for simplicity
+	catchRate := 100.0 / (1.0 + float64(baseExperience)/60.0) // roll to beat, decreases with more base xp
+	// 60xp = 50%
+	// 180xp = 25%
+	// 1140xp = 5%
+
+	// determine catch success
+	catchRoll := rand.Intn(96)                 // random roll from 0 to 95 (last int not incl)
+	catchSuccess := catchRoll < int(catchRate) // if we roll less than catch rate, this is true ie caught
+
+	// initial print before determining success or failure of ctaching
+	fmt.Printf("Throwing a Pokeball at %s...\n", pokemonName)
+
+	// catch success check
+	if catchSuccess { // true
+		fmt.Printf("%s was caught!\n", pokemonName) // caught a pokemon
+
+		// add to pokedex here -- to be implemented later
+		cfg.Pokedex.PokemonAdd(pokemonName, res)
+		// we use the method PokemonAdd on the pokedex to add a pokemon to it
+		// Pokedex is init in config and thus a field of cfg
+
+		// NOTE: res = PokemonStats!
+		fmt.Printf("%s has been added to the Pokedex!\n", pokemonName) // indicate added to pokedex
+
+	} else { // false
+		fmt.Printf("%s escaped!\n", pokemonName) // it escaped
+		// no pokemon added as catchSuccess is false
+	}
+
+	// return success
+	return nil
+}
+
 // startREPL starts the Read-Eval-Print-Loop for the Pokedex CLI
 func startREPL(pokeClient pokeapi.Client) {
 	// block until user input
 	scanner := bufio.NewScanner(os.Stdin) // wait for input
 	commands := getCommands()             // get all commands
 	cfg := &config{
-		PokeapiClient: pokeClient, // store client in config
+		PokeapiClient: pokeClient,           // store client in config
+		Pokedex:       pokeapi.NewPokedex(), // store pokedex in config,
 	} // init config ptr for NEXT & PREVIOUS pagination
 
 	// infinite loop
